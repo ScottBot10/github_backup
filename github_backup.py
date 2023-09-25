@@ -123,6 +123,8 @@ class User:
         self.exclude_releases = self._config_val('exclude_releases', False, global_config, user_config)
         self.exclude_projects = self._config_val('exclude_owner_projects', False, global_config, user_config)
         self.org_metadata_only = self._config_val('org_metadata_only', False, global_config, user_config)
+        self.forks = self._config_val('forks', 'exclude', global_config, user_config)
+        self.disabled = self._config_val('disabled_repos', 'include', global_config, user_config)
 
         self.auth_headers = [("Authorization", f"Bearer {self.token}")]
         self.headers = dict(**HEADERS, **dict(self.auth_headers))
@@ -139,13 +141,30 @@ class User:
         else:
             return default
 
+    @staticmethod
+    def _filter_ieo(ieo, value):
+        """
+        Returns a boolean whether this item should be included
+        """
+        return (
+                ieo == "include" or
+                (ieo == "exclude" and not value) or
+                (ieo == "only" and value)
+        )
+
     def get_repos(self):
         js = request(f"{API}/user/repos", self.logger, headers=self.headers, params={
             'affiliation': self.affiliation,
             'visibility': self.visibility
         })
         self.logger.debug(f"Got repository info")
-        return {repo.get('full_name') for repo in js} - self.exclude_repos
+        return {
+            repo.get("full_name") for repo in js
+            if (
+                    self._filter_ieo(self.forks, js.get("fork")) and
+                    self._filter_ieo(self.disabled, js.get("disabled"))
+            )
+        } - self.exclude_repos
 
     def start_migration(self):
         data = {
@@ -180,6 +199,7 @@ class User:
                 if self.outfile is not None:
                     dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.%f%z")
                     self.save_backup(dt)
+                    # TODO: add auto-delete
                 break
             elif state == "failed":
                 self.logger.error(f"Backup for {self.username} failed!")
