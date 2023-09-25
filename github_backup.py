@@ -1,13 +1,14 @@
 import json
+import logging
+import logging.config
 import os
 import shutil
 import threading
 import time
 from datetime import datetime
 from urllib.parse import urlencode
-import logging
-import logging.config
 from urllib.request import urlopen, Request
+from urllib.error import HTTPError
 
 try:
     from dotenv import load_dotenv
@@ -28,7 +29,6 @@ API = "https://api.github.com"
 HEADERS = {"Accept": "application/vnd.github+json"}
 
 
-# TODO: add error logging
 def request(url, logger, params=None, headers=None, json_data=None):
     if params:
         url += "?" + urlencode(params)
@@ -37,8 +37,13 @@ def request(url, logger, params=None, headers=None, json_data=None):
     if json_data is not None:
         json_data = json.dumps(json_data).encode("utf-8")
         headers = dict(**headers, **{"Content-Type": "application/json"})
-    with urlopen(Request(url, headers=headers, data=json_data)) as r:
-        return json.loads(r.read())
+    try:
+        with urlopen(Request(url, headers=headers, data=json_data)) as r:
+            return json.loads(r.read())
+    except HTTPError as e:
+        logger.exception(f"{e.__class__.__qualname__} {url=} {params=} {headers=} {json_data=} {e.fp.read()=}")
+    except Exception as e:
+        logger.exception(f"{e.__class__.__qualname__} {url=} {params=} {headers=} {json_data=}")
 
 
 # try to use the PyYAML library. If it is not available, use the json library
@@ -118,7 +123,8 @@ class User:
         self.exclude_projects = self._config_val('exclude_owner_projects', False, global_config, user_config)
         self.org_metadata_only = self._config_val('org_metadata_only', False, global_config, user_config)
 
-        self.headers = dict(**HEADERS, Authorization=f"Bearer {self.token}")
+        self.auth_headers = [("Authorization", f"Bearer {self.token}")]
+        self.headers = dict(**HEADERS, **dict(self.auth_headers))
 
         self.repos = list(self.get_repos()) if not self.org_metadata_only else []
         self.id, self.username = self.start_migration()
@@ -174,7 +180,6 @@ class User:
                 if self.outfile is not None:
                     dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.%f%z")
                     self.save_backup(dt)
-                    self.logger.info(f"Saved backup for {self.username}")
                 break
             elif state == "failed":
                 self.logger.error(f"Backup for {self.username} failed!")
@@ -191,12 +196,20 @@ class User:
         if not os.path.isdir(dirname):
             self.logger.debug(f"Creating path: {dirname}")
             os.makedirs(dirname)
-
-        with (
-            urlopen(Request(f"{API}/user/migrations/{self.id}/archive", headers=self.headers)) as r,
-            open(filename, 'wb') as f
-        ):
-            shutil.copyfileobj(r, f)
+        url = f"{API}/user/migrations/{self.id}/archive"
+        try:
+            req = Request(url)
+            for key, val in self.auth_headers:
+                req.add_unredirected_header(key, val)
+            with urlopen(req) as r, open(filename, 'wb') as f:
+                shutil.copyfileobj(r, f)
+        except HTTPError as e:
+            self.logger.exception(f"{e.__class__.__qualname__} {url=} {self.auth_headers=} "
+                                  f"{e.fp.headers=} {e.fp.read()=}")
+        except Exception as e:
+            self.logger.exception(f"{e.__class__.__qualname__} {url=} {self.auth_headers=}")
+        else:
+            self.logger.info(f"Saved backup for {self.username}")
 
 
 def main(args):
