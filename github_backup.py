@@ -29,7 +29,7 @@ API = "https://api.github.com"
 HEADERS = {"Accept": "application/vnd.github+json"}
 
 
-def request(url, logger, params=None, headers=None, json_data=None):
+def request(url, logger, params=None, headers=None, json_data=None, method=None):
     if params:
         url += "?" + urlencode(params)
     if headers is None:
@@ -39,7 +39,7 @@ def request(url, logger, params=None, headers=None, json_data=None):
         headers = dict(**headers, **{"Content-Type": "application/json"})
 
     try:
-        with urlopen(Request(url, headers=headers, data=json_data)) as r:
+        with urlopen(Request(url, headers=headers, data=json_data, method=method)) as r:
             return json.loads(r.read())
     except HTTPError as e:
         logger.exception(f"{e.__class__.__qualname__} {url=} {params=} {headers=} {json_data=} {e.fp.read()=}")
@@ -111,6 +111,7 @@ class User:
 
         self.outfile = self._config_val('outfile', None, global_config, user_config)
         self.check_time = self._config_val('check_time', 30, global_config, user_config)
+        self.delete = self._config_val('delete', True, global_config, user_config)
         self.affiliation = self._config_val('affiliation', 'owner', global_config, user_config)
         self.visibility = self._config_val('visibility', 'all', global_config, user_config)
         self.exclude_repos = self._config_val('exclude_repos', set(), global_config, user_config)
@@ -131,6 +132,10 @@ class User:
 
         self.repos = list(self.get_repos()) if not self.org_metadata_only else []
         self.id, self.username = self.start_migration()
+
+    @property
+    def archive_url(self):
+        return f"{API}/user/migrations/{self.id}/archive"
 
     @staticmethod
     def _config_val(var, default, global_config, user_config):
@@ -199,7 +204,8 @@ class User:
                 if self.outfile is not None:
                     dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.%f%z")
                     self.save_backup(dt)
-                    # TODO: add auto-delete
+                if self.delete:
+                    js = request(self.archive_url, self.logger, headers=self.headers, method="DELETE")
                 break
             elif state == "failed":
                 self.logger.error(f"Backup for {self.username} failed!")
@@ -216,7 +222,7 @@ class User:
         if not os.path.isdir(dirname):
             self.logger.debug(f"Creating path: {dirname}")
             os.makedirs(dirname)
-        url = f"{API}/user/migrations/{self.id}/archive"
+        url = self.archive_url
         try:
             req = Request(url)
             # The requests gets redirected to an AWS S3 endpoint, and it gives an error if the GitHub authorization

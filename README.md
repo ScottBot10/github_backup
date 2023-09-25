@@ -118,6 +118,7 @@ The config for each user is in a list under the `users` key. For each user, the 
 - `token` - Your GitHub [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens). Cannot go in `global`. ***Required***
 - `outfile` - The file name to save the backup as, including the `.tar.gz`. Can use formatting syntax including: `{username}`, `{datetime}` (of backup finish; see [format codes](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)) and `{id}` (of backup). If it is set to None, then the script will not download the backup. It will still check its state.
 - `check_time` - How long to wait inbetween checking the state of the backup in seconds. If it is set to None, the script won't query the state of the backup and so won't automatically download it. Default: `30`
+- `delete` - Whether to delete the archive from GitHub's storage after downloading. Default: `True`
 - `affiliation` - Comma separated values. Options: `owner`, `collaborator` and `organization_member`. Default: `owner`
 - `visibility` - Limits repositories to back up to ones with a certain visibility. Options: `all`, `public`, `private`. Default: `all`
 - `exclude_repos` - A string or list of strings that are the full names (`username/repo_name`) of repositories that you don't want to back up.
