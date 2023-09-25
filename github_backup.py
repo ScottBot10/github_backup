@@ -166,8 +166,8 @@ class User:
         return {
             repo.get("full_name") for repo in js
             if (
-                    self._filter_ieo(self.forks, js.get("fork")) and
-                    self._filter_ieo(self.disabled, js.get("disabled"))
+                    self._filter_ieo(self.forks, repo.get("fork")) and
+                    self._filter_ieo(self.disabled, repo.get("disabled"))
             )
         } - self.exclude_repos
 
