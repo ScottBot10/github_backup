@@ -186,7 +186,11 @@ class User:
             "datetime": dt,
             "id": self.id
         })
+        dirname = os.path.dirname(filename)
         self.logger.debug(f"Downloading {self.username}'s backup to {filename}")
+        if not os.path.isdir(dirname):
+            self.logger.debug(f"Creating path: {dirname}")
+            os.makedirs(dirname)
 
         with (
             urlopen(Request(f"{API}/user/migrations/{self.id}/archive", headers=self.headers)) as r,
