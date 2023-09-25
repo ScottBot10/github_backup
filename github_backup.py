@@ -6,9 +6,9 @@ import shutil
 import threading
 import time
 from datetime import datetime
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
-from urllib.error import HTTPError
 
 try:
     from dotenv import load_dotenv
@@ -37,6 +37,7 @@ def request(url, logger, params=None, headers=None, json_data=None):
     if json_data is not None:
         json_data = json.dumps(json_data).encode("utf-8")
         headers = dict(**headers, **{"Content-Type": "application/json"})
+
     try:
         with urlopen(Request(url, headers=headers, data=json_data)) as r:
             return json.loads(r.read())
@@ -133,9 +134,10 @@ class User:
     def _config_val(var, default, global_config, user_config):
         if var in user_config:
             return user_config[var]
-        if var in global_config:
+        elif var in global_config:
             return global_config[var]
-        return default
+        else:
+            return default
 
     def get_repos(self):
         js = request(f"{API}/user/repos", self.logger, headers=self.headers, params={
@@ -146,7 +148,6 @@ class User:
         return {repo.get('full_name') for repo in js} - self.exclude_repos
 
     def start_migration(self):
-
         data = {
             "repositories": self.repos,
             "lock_repositories": self.lock_repositories,
@@ -161,7 +162,6 @@ class User:
         js = request(f"{API}/user/migrations", self.logger, headers=self.headers, json_data=data)
         mid, name = js["id"], js["owner"]["login"]
         self.logger.info(f"Started backup {mid} for user: {name}")
-        self.logger.debug(js)
         return mid, name
 
     def get_state(self):
@@ -199,10 +199,13 @@ class User:
         url = f"{API}/user/migrations/{self.id}/archive"
         try:
             req = Request(url)
+            # The requests gets redirected to an AWS S3 endpoint, and it gives an error if the GitHub authorization
+            # headers are also redirected so unredirected headers are needed.
             for key, val in self.auth_headers:
                 req.add_unredirected_header(key, val)
             with urlopen(req) as r, open(filename, 'wb') as f:
                 shutil.copyfileobj(r, f)
+
         except HTTPError as e:
             self.logger.exception(f"{e.__class__.__qualname__} {url=} {self.auth_headers=} "
                                   f"{e.fp.headers=} {e.fp.read()=}")
