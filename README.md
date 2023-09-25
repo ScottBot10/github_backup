@@ -2,9 +2,15 @@
 Backs up GitHub data for multiple users by using GitHub's [migration API](https://docs.github.com/en/rest/migrations/users). Probably won't work to back up organisations.
 
 ## Usage
-This script requires Python 3. If you want to use config in yaml, you will need the [PyYAML](https://pypi.org/project/PyYAML/) library. You can install it like this:
+This script requires Python 3. 
+
+If you want to use config in yaml, you will need the [PyYAML](https://pypi.org/project/PyYAML/) library. You can install it like this:
 ```shell
 pip install PyYAML
+```
+If you are using the `PyYAML` library and want to use the `!ENV` constructor with a `.env` file you will need to install the `python-dotenv` module:
+```shell
+pip install python-dotenv
 ```
 To run the script run:
 ```shell
