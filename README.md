@@ -128,6 +128,8 @@ The config for each user is in a list under the `users` key. For each user, the 
 - `exclude_releases` - Do not include releases. Default: `False`
 - `exclude_owner_projects` - Whether projects owned by the user should be excluded. Default: `False`
 - `org_metadata_only` - Whether the backup should only include metadata (will ignore the exclude flags.). Default: `False`
+- `forks` - Whether to include forks or not. Options: `include`, `exclude`, `only`. Default: `exclude`
+- `disabled_repos` - Whether to include disabled repos. Options: `include`, `exclude`, `only`. Default: `include`
 
 #### Logging
 This script uses Python's [logging](https://docs.python.org/3/library/logging.html) module to log output. You can add logging config under the `logging` key using the [dictConfig() schema](https://docs.python.org/3/library/logging.config.html#configuration-dictionary-schema). The variable, `LOGGER_NAME`, at the top of the script will be used as the name of the logger (default `'github_backup'`), so make sure to have the same name in the `loggers` part of your config.
