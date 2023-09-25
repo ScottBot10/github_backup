@@ -40,7 +40,10 @@ def request(url, logger, params=None, headers=None, json_data=None, method=None)
 
     try:
         with urlopen(Request(url, headers=headers, data=json_data, method=method)) as r:
-            return json.loads(r.read())
+            js = r.read()
+            if js:
+                js = json.loads(js)
+            return r.status, js
     except HTTPError as e:
         logger.exception(f"{e.__class__.__qualname__} {url=} {params=} {headers=} {json_data=} {e.fp.read()=}")
     except Exception as e:
@@ -158,7 +161,7 @@ class User:
         )
 
     def get_repos(self):
-        js = request(f"{API}/user/repos", self.logger, headers=self.headers, params={
+        _, js = request(f"{API}/user/repos", self.logger, headers=self.headers, params={
             'affiliation': self.affiliation,
             'visibility': self.visibility
         })
@@ -183,13 +186,13 @@ class User:
         }
         if self.org_metadata_only:
             data["org_metadata_only"] = self.org_metadata_only
-        js = request(f"{API}/user/migrations", self.logger, headers=self.headers, json_data=data)
+        _, js = request(f"{API}/user/migrations", self.logger, headers=self.headers, json_data=data)
         mid, name = js["id"], js["owner"]["login"]
         self.logger.info(f"Started backup {mid} for user: {name}")
         return mid, name
 
     def get_state(self):
-        js = request(f"{API}/user/migrations/{self.id}", self.logger, headers=self.headers)
+        _, js = request(f"{API}/user/migrations/{self.id}", self.logger, headers=self.headers)
         state = js.get('state')
         self.logger.debug(f"Got state: '{state}'")
         return state, js.get('updated_at')
@@ -205,7 +208,7 @@ class User:
                     dt = datetime.strptime(dt, "%Y-%m-%dT%H:%M:%S.%f%z")
                     self.save_backup(dt)
                 if self.delete:
-                    js = request(self.archive_url, self.logger, headers=self.headers, method="DELETE")
+                    code, js = request(self.archive_url, self.logger, headers=self.headers, method="DELETE")
                 break
             elif state == "failed":
                 self.logger.error(f"Backup for {self.username} failed!")
